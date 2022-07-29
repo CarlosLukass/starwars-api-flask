@@ -10,7 +10,7 @@ class Users(db.Model):
     is_active = db.Column(db.Boolean(), unique=False, nullable=False)
 
     def __repr__(self):
-        return '<Users %r>' % self.name
+        return '<Users %r>' % self.email
 
     def serialize(self):
         return {
@@ -147,7 +147,7 @@ class Starships(db.Model):
 # FAVORITES model
 class Favorites(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=False, nullable=False)
     characters_id = db.Column(db.Integer, db.ForeignKey('characters.id') , unique=False, nullable=True)
     species_id = db.Column(db.Integer, db.ForeignKey('species.id') , unique=False, nullable=True)
     planets_id = db.Column(db.Integer, db.ForeignKey('planets.id') , unique=False, nullable=True)
@@ -155,7 +155,7 @@ class Favorites(db.Model):
     starships_id = db.Column(db.Integer, db.ForeignKey('starships.id') , unique=False, nullable=True)
 
     # Relationships
-    user = db.relationship('Users', primaryjoin=user_id == Users.id)
+    users = db.relationship('Users', primaryjoin=user_id == Users.id)
     characters = db.relationship('Characters', primaryjoin=characters_id == Characters.id)
     species = db.relationship('Species', primaryjoin=species_id == Species.id)
     planets = db.relationship('Planets', primaryjoin=planets_id == Planets.id)

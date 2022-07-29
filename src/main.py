@@ -212,20 +212,45 @@ def handle_starships_by_id(id):
         return jsonify(response_body), 200
 
 # Favorites ======================================================================
-@app.route('/favorites', methods=['GET'])
-def handle_favorites():
+@app.route('/favorites/<int:user_id>', methods=['GET'])
+def handle_favorites(user_id):
 
     # GET
     if request.method == 'GET':
-        favorites = Favorites.query.all()
-        total_favorites = len(favorites)
+        favorites = Favorites.query.filter_by( user_id = user_id )
         results = list(map(lambda favorite:favorite.serialize(), favorites))
         response_body = {
             'status': int(Response().status_code),
             'results': results,
-            'total_favorites': total_favorites
         }
         return jsonify(response_body), 200
+
+# Add new favorite
+@app.route('/favorites/<category>/<int:id>', methods=['POST'])
+def handle_add_new_favorites(category,id):
+        
+        body = request.get_json()
+        user_id = User.query.get(body['user_id'])
+
+        if category == 'characters':
+            new_favorite = Favorites( characters_id = body[f"{category}_{id}"], user_id = body['user_id'])
+        if category == 'species':
+            new_favorite = Favorites( species_id = body[f"{category}_{id}"], user_id = body['user_id'])
+        if category == 'planets':
+            new_favorite = Favorites( planets_id = body[f"{category}_{id}"], user_id = body['user_id'])
+        if category == 'vehicles':
+            new_favorite = Favorites( vehicles_id = body[f"{category}_{id}"], user_id = body['user_id'])
+        if category == 'starships':
+            new_favorite = Favorites( starships_id = body[f"{category}_{id}"], user_id = body['user_id'])
+
+        db.session.add(new_favorite)
+        db.session.commit()
+        
+        response_body = {
+        'results': new_favorite.serialize()
+        }
+        return jsonify(response_body), 200
+        
         
 
 ######################################################
