@@ -8,17 +8,29 @@ from flask_swagger import swagger
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
-from models import db, Users, Characters, Species, Planets, Vehicles, Starships, Favorites
-#from models import Person
+
+# Flask_jwt_extended
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+
+# Models
+from models import db, Users, Characters, Species, Planets, Vehicles, Starships, Favorites_characters, Favorites_planets, Favorites_species, Favorites_vehicles, Favorites_starships
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DB_CONNECTION_STRING')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY')
 MIGRATE = Migrate(app, db)
+
+# Configurations
+jwt = JWTManager(app)
 db.init_app(app)
-CORS(app)
 setup_admin(app)
+CORS(app)
+
 
 # Handle/serialize errors like a JSON object
 @app.errorhandler(APIException)
@@ -60,6 +72,52 @@ def handle_users_by_id(id):
             'result': result
         }
         return jsonify(response_body), 200
+
+# Login  ====================================================================
+@app.route("/login", methods=["POST"])
+def login():
+    user_email = request.json.get("email", None)
+    user_password = request.json.get("password", None)
+
+    user = Users.query.filter_by( email = user_email ).first()
+    print(f"esto es: {user}")
+    
+
+    # Validations
+    # If user send a empty field
+    if user_email is None or user_password is None:
+        return jsonify({"msg": "please send your email and password"}), 401
+
+    if user is None:
+        return jsonify({"msg": "wrong username or password, try again"}), 401
+    else:
+        if user_password != user.password:
+            return jsonify({"msg": "wrong username or password, try again"}), 401
+
+    access_token = create_access_token(identity=user_email)
+    return jsonify(access_token=access_token)
+
+    
+# Register  ====================================================================
+@app.route("/signup", methods=["POST"])
+def signup():
+    email = request.json.get("email", None)
+    password = request.json.get("password", None)
+    
+    # Comprobations
+    if email is None or password is None:
+        return jsonify({"msg": "Bad email or password"}), 401
+
+    new_user = Users(email = email, password = password, is_active = True)
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    body_response = {
+        "msg": "User create successfully"
+    }
+
+    return body_response
 
 # Characters  ====================================================================
 @app.route('/characters', methods=['GET'])
@@ -212,72 +270,41 @@ def handle_starships_by_id(id):
         return jsonify(response_body), 200
 
 # Favorites ======================================================================
-@app.route('/favorites/<int:user_id>', methods=['GET'])
-def handle_favorites(user_id):
+@app.route('/favorites', methods=['GET'])
+@jwt_required()
+def handle_favorites():
 
     # GET
     if request.method == 'GET':
-        favorites = Favorites.query.filter_by( user_id = user_id )
-        results = list(map(lambda favorite:favorite.serialize(), favorites))
+        current_user = get_jwt_identity()
+
+        if current_user is None:
+            return jsonify({"msg": "please login to see your favorites"}), 401
+
+        user_data = Users.query.filter_by( email = current_user).first()
+        print(user_data.id)
+
+        fav_characters = Favorites_characters.query.filter_by( user_id = user_data.id ).all()
+        fav_planets = Favorites_planets.query.filter_by( user_id = user_data.id ).all()
+        fav_species = Favorites_species.query.filter_by( user_id = user_data.id ).all()
+        fav_vehicles = Favorites_vehicles.query.filter_by( user_id = user_data.id ).all()
+        fav_starships = Favorites_starships.query.filter_by( user_id = user_data.id ).all()
+
+        results = {
+            "characters": list(map(lambda item: item.serialize(), fav_characters)),
+            "characters": list(map(lambda item: item.serialize(), fav_planets)),
+            "characters": list(map(lambda item: item.serialize(), fav_species)),
+            "characters": list(map(lambda item: item.serialize(), fav_vehicles)),
+            "characters": list(map(lambda item: item.serialize(), fav_starships)),
+        }
+
         response_body = {
             'status': int(Response().status_code),
             'results': results,
         }
         return jsonify(response_body), 200
 
-# Add new favorite
-@app.route('/favorites/<category>/<int:id>', methods=['POST', 'DELETE'])
-def handle_add_new_favorites(category,id):
-        
-    # POST
-    if response.method == 'POST':
-        body = request.get_json()
-        user_id = User.query.get(body['user_id'])
 
-        if category == 'characters':
-            new_favorite = Favorites( characters_id = body[f"{category}_{id}"], user_id = body['user_id'])
-        if category == 'species':
-            new_favorite = Favorites( species_id = body[f"{category}_{id}"], user_id = body['user_id'])
-        if category == 'planets':
-            new_favorite = Favorites( planets_id = body[f"{category}_{id}"], user_id = body['user_id'])
-        if category == 'vehicles':
-            new_favorite = Favorites( vehicles_id = body[f"{category}_{id}"], user_id = body['user_id'])
-        if category == 'starships':
-            new_favorite = Favorites( starships_id = body[f"{category}_{id}"], user_id = body['user_id'])
-
-        db.session.add(new_favorite)
-        db.session.commit()
-        
-        response_body = {
-            'results': new_favorite.serialize()
-        }
-        return jsonify(response_body), 200
-        
-        # DELETE
-        if response.method == 'DELETE':
-            body = request.get_json()
-
-            if category == 'characters':
-                row = Favorites.query.filter_by(characters_id = body[f"{category}_{id}"], user_id = body['user_id'])
-            if category == 'species':
-                row = Favorites.query.filter_by(species_id = body[f"{category}_{id}"], user_id = body['user_id'])
-            if category == 'planets':
-                row = Favorites.query.filter_by(planets_id = body[f"{category}_{id}"], user_id = body['user_id'])
-            if category == 'vehicles':
-                row = Favorites.query.filter_by(vehicles_id = body[f"{category}_{id}"], user_id = body['user_id'])
-            if category == 'starships':
-                row = Favorites.query.filter_by(starships_id = body[f"{category}_{id}"], user_id = body['user_id'])
-
-        session.delete(row)
-        session.commit()
-
-        response_body = {
-            'results': 'record deleted successfully'
-        }
-        return jsonify(response_body), 200
-
-        
-        
 
 ######################################################
 # this only runs if `$ python src/main.py` is executed

@@ -144,33 +144,98 @@ class Starships(db.Model):
             'cost_in_credits': self.cost_in_credits,
         }
 
-# FAVORITES model
-class Favorites(db.Model):
+# FAVORITES Characters model
+class Favorites_characters(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=False, nullable=False)
-    characters_id = db.Column(db.Integer, db.ForeignKey('characters.id') , unique=False, nullable=True)
-    species_id = db.Column(db.Integer, db.ForeignKey('species.id') , unique=False, nullable=True)
-    planets_id = db.Column(db.Integer, db.ForeignKey('planets.id') , unique=False, nullable=True)
-    vehicles_id = db.Column(db.Integer, db.ForeignKey('vehicles.id') , unique=False, nullable=True)
-    starships_id = db.Column(db.Integer, db.ForeignKey('starships.id') , unique=False, nullable=True)
+    character_id = db.Column(db.Integer, db.ForeignKey('characters.id'), unique=False, nullable=False)
 
     # Relationships
     users = db.relationship('Users', primaryjoin=user_id == Users.id)
-    characters = db.relationship('Characters', primaryjoin=characters_id == Characters.id)
-    species = db.relationship('Species', primaryjoin=species_id == Species.id)
-    planets = db.relationship('Planets', primaryjoin=planets_id == Planets.id)
-    vehicles = db.relationship('Vehicles', primaryjoin=vehicles_id == Vehicles.id)
-    starships = db.relationship('Starships', primaryjoin=starships_id == Starships.id)
+    characters = db.relationship('Characters', primaryjoin=character_id == Characters.id)
 
     def __repr__(self):
-        return '<Favorites %r>' % self.name
+        return '<Favorites_characters %r>' % self.name
 
     def serialize(self):
         return {
-            'id': self.id,
-            'character_id': self.characters_id,
-            'species_id': self.species_id,
-            'planets_id': self.planets_id,
-            'vehicles_id': self.vehicles_id,
-            'starships_id': self.starships_id,
+            'user_id': self.user_id,
+            'character_id': self.character_id
         }
+        
+# FAVORITES Planets model
+class Favorites_planets(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=False, nullable=False)
+    planet_id = db.Column(db.Integer,db.ForeignKey('planets.id'), unique=False, nullable=False)
+
+    # Relationships
+    users = db.relationship('Users', primaryjoin=user_id == Users.id)
+    planets = db.relationship('Planets', primaryjoin=planet_id == Planets.id)
+
+    def __repr__(self):
+        return '<Favorites_planets %r>' % self.name
+
+    def serialize(self):
+        return {
+            'user_id': self.user_id,
+            'planet_id': self.planet_id
+        }
+
+# FAVORITES Species model
+class Favorites_species(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=False, nullable=False)
+    specie_id = db.Column(db.Integer,db.ForeignKey('species.id'), unique=False, nullable=False)
+
+    # Relationships
+    users = db.relationship('Users', primaryjoin=user_id == Users.id)
+    species = db.relationship('Species', primaryjoin=specie_id == Species.id)
+
+    def __repr__(self):
+        return '<Favorites_species %r>' % self.name
+
+    def serialize(self):
+        return {
+            'user_id': self.user_id,
+            'specie_id': self.specie_id
+        }
+
+# FAVORITES Vehicles model
+class Favorites_vehicles(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=False, nullable=False)
+    vehicle_id = db.Column(db.Integer,db.ForeignKey('vehicles.id'), unique=False, nullable=False)
+
+    # Relationships
+    users = db.relationship('Users', primaryjoin=user_id == Users.id)
+    vehicles = db.relationship('Vehicles', primaryjoin=vehicle_id == Vehicles.id)
+
+    def __repr__(self):
+        return '<Favorites_vehicles %r>' % self.name
+
+    def serialize(self):
+        return {
+            'user_id': self.user_id,
+            'vehicle_id': self.vehicle_id
+        }
+
+# FAVORITES Starships model
+class Favorites_starships(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=False, nullable=False)
+    starship_id = db.Column(db.Integer, db.ForeignKey('starships.id'), unique=False, nullable=False)
+
+    # Relationships
+    users = db.relationship('Users', primaryjoin=user_id == Users.id)
+    starships = db.relationship('Starships', primaryjoin=starship_id == Starships.id)
+
+    def __repr__(self):
+        return '<Favorites_starships %r>' % self.name
+
+    def serialize(self):
+        return {
+            'user_id': self.user_id,
+            'starship_id': self.starship_id
+        }
+
