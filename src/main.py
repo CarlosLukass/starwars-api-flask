@@ -226,9 +226,11 @@ def handle_favorites(user_id):
         return jsonify(response_body), 200
 
 # Add new favorite
-@app.route('/favorites/<category>/<int:id>', methods=['POST'])
+@app.route('/favorites/<category>/<int:id>', methods=['POST', 'DELETE'])
 def handle_add_new_favorites(category,id):
         
+    # POST
+    if response.method == 'POST':
         body = request.get_json()
         user_id = User.query.get(body['user_id'])
 
@@ -247,9 +249,33 @@ def handle_add_new_favorites(category,id):
         db.session.commit()
         
         response_body = {
-        'results': new_favorite.serialize()
+            'results': new_favorite.serialize()
         }
         return jsonify(response_body), 200
+        
+        # DELETE
+        if response.method == 'DELETE':
+            body = request.get_json()
+
+            if category == 'characters':
+                row = Favorites.query.filter_by(characters_id = body[f"{category}_{id}"], user_id = body['user_id'])
+            if category == 'species':
+                row = Favorites.query.filter_by(species_id = body[f"{category}_{id}"], user_id = body['user_id'])
+            if category == 'planets':
+                row = Favorites.query.filter_by(planets_id = body[f"{category}_{id}"], user_id = body['user_id'])
+            if category == 'vehicles':
+                row = Favorites.query.filter_by(vehicles_id = body[f"{category}_{id}"], user_id = body['user_id'])
+            if category == 'starships':
+                row = Favorites.query.filter_by(starships_id = body[f"{category}_{id}"], user_id = body['user_id'])
+
+        session.delete(row)
+        session.commit()
+
+        response_body = {
+            'results': 'record deleted successfully'
+        }
+        return jsonify(response_body), 200
+
         
         
 
