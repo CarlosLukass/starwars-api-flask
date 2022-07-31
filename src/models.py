@@ -57,7 +57,7 @@ class Species(db.Model):
     average_lifespan = db.Column(db.Integer, unique=False, nullable=False)
     hair_colors = db.Column(db.String(20), unique=False, nullable=False)
     eye_colors = db.Column(db.String(20), unique=False, nullable=False)
-    homewold = db.Column(db.String(20), unique=False, nullable=False)
+    homeworld = db.Column(db.String(20), unique=False, nullable=False)
     language = db.Column(db.String(20), unique=False, nullable=False)
 
     def __repr__(self):
@@ -193,7 +193,7 @@ class Favorites_species(db.Model):
     species = db.relationship('Species', primaryjoin=specie_id == Species.id)
 
     def __repr__(self):
-        return '<Favorites_species %r>' % self.name
+        return '<Favorites_species %r>' % self.specie_id
 
     def serialize(self):
         return {

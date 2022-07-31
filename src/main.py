@@ -8,6 +8,8 @@ from flask_swagger import swagger
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from admin import setup_admin
+# Flask_bscrypt
+from flask_bcrypt import Bcrypt
 
 # Flask_jwt_extended
 from flask_jwt_extended import create_access_token
@@ -30,6 +32,7 @@ jwt = JWTManager(app)
 db.init_app(app)
 setup_admin(app)
 CORS(app)
+bcrypt = Bcrypt(app)
 
 
 # Handle/serialize errors like a JSON object
@@ -43,59 +46,26 @@ def sitemap():
     return generate_sitemap(app)
 
 
-# Users ========================================================================
-@app.route('/users', methods=['GET'])
-def handle_users():
-
-    # GET
-    if request.method == 'GET':
-        users = Users.query.all()
-        total_users = len(users)
-        results = list(map(lambda user:user.serialize(), users))
-        response_body = {
-            'status': int(Response().status_code),
-            'total_users': total_users,
-            'results': results
-        }
-        return jsonify(response_body), 200
-
-# Users by ID
-@app.route('/users/<int:id>', methods=['GET'])
-def handle_users_by_id(id):
-    
-    # GET
-    if request.method == 'GET':
-        user = Users.query.get(id)
-        result = user.serialize()
-        response_body = {
-            'status': int(Response().status_code),
-            'result': result
-        }
-        return jsonify(response_body), 200
-
 # Login  ====================================================================
 @app.route("/login", methods=["POST"])
 def login():
     user_email = request.json.get("email", None)
     user_password = request.json.get("password", None)
-
     user = Users.query.filter_by( email = user_email ).first()
-    print(f"esto es: {user}")
-    
 
-    # Validations
-    # If user send a empty field
-    if user_email is None or user_password is None:
-        return jsonify({"msg": "please send your email and password"}), 401
-
-    if user is None:
+    # verify request body
+    if user_email is None or user_password is None or user is None:
         return jsonify({"msg": "wrong username or password, try again"}), 401
+    
+    # verify password
+    if bcrypt.check_password_hash(user.password, user_password):
+        access_token = create_access_token(identity=user_email)
+        return jsonify({
+            "status": Response().status_code,
+            "access_token": access_token
+            })
     else:
-        if user_password != user.password:
-            return jsonify({"msg": "wrong username or password, try again"}), 401
-
-    access_token = create_access_token(identity=user_email)
-    return jsonify(access_token=access_token)
+        return jsonify({"msg": "wrong username or password, try again"}), 401
 
     
 # Register  ====================================================================
@@ -108,16 +78,12 @@ def signup():
     if email is None or password is None:
         return jsonify({"msg": "Bad email or password"}), 401
 
-    new_user = Users(email = email, password = password, is_active = True)
-
+    encrypted_password = bcrypt.generate_password_hash(password)
+    new_user = Users(email = email, password = encrypted_password, is_active = True)
     db.session.add(new_user)
     db.session.commit()
 
-    body_response = {
-        "msg": "User create successfully"
-    }
-
-    return body_response
+    return jsonify({"msg": "user create successfully"}), 200
 
 # Characters  ====================================================================
 @app.route('/characters', methods=['GET'])
@@ -270,7 +236,7 @@ def handle_starships_by_id(id):
         return jsonify(response_body), 200
 
 # Favorites ======================================================================
-@app.route('/favorites', methods=['GET'])
+@app.route('/favorites', methods=['GET', 'POST', 'DELETE'])
 @jwt_required()
 def handle_favorites():
 
@@ -282,7 +248,6 @@ def handle_favorites():
             return jsonify({"msg": "please login to see your favorites"}), 401
 
         user_data = Users.query.filter_by( email = current_user).first()
-        print(user_data.id)
 
         fav_characters = Favorites_characters.query.filter_by( user_id = user_data.id ).all()
         fav_planets = Favorites_planets.query.filter_by( user_id = user_data.id ).all()
@@ -290,19 +255,133 @@ def handle_favorites():
         fav_vehicles = Favorites_vehicles.query.filter_by( user_id = user_data.id ).all()
         fav_starships = Favorites_starships.query.filter_by( user_id = user_data.id ).all()
 
-        results = {
-            "characters": list(map(lambda item: item.serialize(), fav_characters)),
-            "characters": list(map(lambda item: item.serialize(), fav_planets)),
-            "characters": list(map(lambda item: item.serialize(), fav_species)),
-            "characters": list(map(lambda item: item.serialize(), fav_vehicles)),
-            "characters": list(map(lambda item: item.serialize(), fav_starships)),
-        }
-
         response_body = {
             'status': int(Response().status_code),
-            'results': results,
+            'results': {
+            "characters": list(map(lambda item: Species.query.get(item.character_id).serialize(), fav_characters )),
+            "planets": list(map(lambda item: Species.query.get(item.planet_id).serialize(), fav_planets )),
+            "species":  list(map(lambda item: Species.query.get(item.specie_id).serialize(), fav_species )),
+            "vehicles": list(map(lambda item: Species.query.get(item.vehicle_id).serialize(), fav_vehicles )),
+            "starships": list(map(lambda item: Species.query.get(item.starship_id).serialize(), fav_starships )),
+            }
         }
         return jsonify(response_body), 200
+
+
+    # POST
+    if request.method == 'POST':
+        current_user = get_jwt_identity()
+        user = Users.query.filter_by( email = current_user).first()
+        category = request.json.get("category", None)
+        item_id = request.json.get("id", None)
+
+        if user is not None and category is not None and item_id is not None:
+            # Characters
+            if category == 'characters':
+                exist_item = Favorites_characters.query.filter_by(user_id = user.id, character_id = item_id).first()
+                if exist_item is None:
+                    new_favorite = Favorites_characters( user_id = user.id ,character_id = item_id )
+                    db.session.add(new_favorite)
+                    db.session.commit()
+                    return jsonify({"msg": "favorite added successfully"}), 200
+                else:
+                    return jsonify({"msg": "that favorite already exist"}), 200
+            
+            # Planets
+            if category == 'planets':
+                exist_item = Favorites_planets.query.filter_by(user_id = user.id, planet_id = item_id).first()
+                if exist_item is None:
+                    new_favorite = Favorites_planets( user_id = user.id ,planet_id = item_id )
+                    db.session.add(new_favorite)
+                    db.session.commit()
+                    return jsonify({"msg": "favorite added successfully"}), 200
+                else:
+                    return jsonify({"msg": "that favorite already exist"}), 200
+
+            # Species
+            if category == 'species':
+                exist_item = Favorites_species.query.filter_by(user_id = user.id, specie_id = item_id).first()
+                if exist_item is None:
+                    new_favorite = Favorites_species( user_id = user.id ,specie_id = item_id )
+                    db.session.add(new_favorite)
+                    db.session.commit()
+                    return jsonify({"msg": "favorite added successfully"}), 200
+                else:
+                    return jsonify({"msg": "that favorite already exist"}), 200
+            
+            # Vehicles
+            if category == 'vehicles':
+                exist_item = Favorites_vehicles.query.filter_by(user_id = user.id, vehicle_id = item_id).first()
+                if exist_item is None:
+                    new_favorite = Favorites_vehicles( user_id = user.id ,vehicle_id = item_id )
+                    db.session.add(new_favorite)
+                    db.session.commit()
+                    return jsonify({"msg": "favorite added successfully"}), 200
+                else:
+                    return jsonify({"msg": "that favorite already exist"}), 200
+
+            # Starships 
+            if category == 'starships':
+                exist_item = Favorites_starships.query.filter_by(user_id = user.id, starship_id = item_id).first()
+                if exist_item is None:
+                    new_favorite = Favorites_starships( user_id = user.id ,starship_id = item_id )
+                    db.session.add(new_favorite)
+                    db.session.commit()
+                    return jsonify({"msg": "favorite added successfully"}), 200
+                else:
+                    return jsonify({"msg": "that favorite already exist"}), 200
+
+            return jsonify({"msg": "The category not exist"}), 400         
+
+        else:
+            return jsonify({"msg": "You need to send a category and id"}), 400
+
+
+    # DELETE
+    if request.method == 'DELETE':
+        
+        current_user = get_jwt_identity()
+        user = Users.query.filter_by(email = current_user).first()
+
+        category = request.json.get("category", None)
+        item_id = request.json.get("id", None)
+
+        if user is not None and category is not None and item_id is not None:
+            if category == 'characters':
+                row = Favorites_characters.query.filter_by( user_id = user.id, character_id = item_id ).first()
+                db.session.delete(row)
+                db.session.commit()
+                return jsonify({"result": "favorite removed successfully"}), 200
+                
+            if category == 'planets':
+                row = Favorites_planets.query.filter_by( user_id = user.id, planet_id = item_id ).first()
+                db.session.delete(row)
+                db.session.commit()
+                return jsonify({"msg": "favorite removed successfully"}), 200
+                
+            if category == 'species':
+                row = Favorites_species.query.filter_by( user_id = user.id, specie_id = item_id ).first()
+                db.session.delete(row)
+                db.session.commit()
+                return jsonify({"msg": "favorite removed successfully"}), 200
+                
+            if category == 'vehicles':
+                row = Favorites_vehicles.query.filter_by( user_id = user.id, vehicle_id = item_id ).first()
+                db.session.delete(row)
+                db.session.commit()
+                return jsonify({"msg": "favorite removed successfully"}), 200
+                
+            if category == 'starships':
+                row = Favorites_starships.query.filter_by( user_id = user.id, starship_id = item_id ).first()
+                db.session.delete(row)
+                db.session.commit()
+                return jsonify({"msg": "favorite removed successfully"}), 200
+
+            return jsonify({"msg": "The category not exist"}), 400
+
+        else:
+            return jsonify({"msg": "You need to send a category and id"}), 400
+
 
 
 
